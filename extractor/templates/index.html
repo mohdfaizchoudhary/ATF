@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OvinEnterPrises| GeM Advanced Extractor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #ffffff; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #0891b2; border-radius: 10px; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            backdrop-filter: blur(8px);
+        }
+
+        /* Make the category select horizontally scrollable and prevent option wrapping */
+        #catList {
+            white-space: nowrap;
+            overflow-x: auto;
+        }
+        #catList option {
+            white-space: nowrap;
+        }
+        /* Small scroll buttons */
+        .scroll-btn { width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center }
+    </style>
+</head>
+<body class="min-h-screen flex text-gray-800">
+
+    <div id="loadingOverlay" class="flex flex-col items-center justify-center text-white">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-cyan-500 mb-4"></div>
+        <h2 class="text-xl font-bold italic text-cyan-400">OvinEnterPrises is Scraping GeM Portal...</h2>
+        <p class="text-sm text-gray-400 mt-2">Please wait, processing multiple categories & pages.</p>
+    </div>
+
+    <div class="w-[20%] bg-black text-white flex-shrink-0 flex flex-col shadow-2xl">
+        <div class="p-6 text-2xl font-bold border-b border-gray-800 text-cyan-500 tracking-wider">
+            OVIN<span class="text-white">ENTERPRISES</span>
+        </div>
+        <nav class="flex-1 p-4 space-y-2">
+            <a href="/" class="block p-3 rounded bg-cyan-600 text-white shadow-lg transition"><i class="fas fa-home mr-3"></i> Dashboard</a>
+            <button onclick="toggleModal()" class="w-full text-left block p-3 rounded hover:bg-gray-900 transition text-gray-300 hover:text-cyan-400">
+                <i class="fas fa-user-plus mr-3"></i> Add Client
+            </button>
+            <a href="#" class="block p-3 rounded hover:bg-gray-900 transition text-gray-300 hover:text-cyan-400"><i class="fas fa-history mr-3"></i> History</a>
+        </nav>
+        <div class="p-4 border-t border-gray-800 text-[10px] text-gray-500 uppercase tracking-tighter">
+            v2.0 Beta | Ghaziabad, UP
+        </div>
+    </div>
+
+    <div class="flex-1 flex flex-col bg-white">
+        <header class="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-8">
+            <h1 class="text-xl font-bold text-gray-800 tracking-tight">GeM Bid Extractor Portal</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-500">Welcome, <strong class="text-black">Faiz</strong></span>
+                <div class="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600 font-bold border border-cyan-200">MF</div>
+            </div>
+        </header>
+
+        <main class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div onclick="openClientsModal()" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md hover:border-cyan-300 transition">
+                    <p class="text-gray-400 text-xs font-bold uppercase mb-1">Total Clients</p>
+                    <h3 class="text-3xl font-black text-black">{{ clients.count }}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <p class="text-gray-400 text-xs font-bold uppercase mb-1">Bids Found Today</p>
+                    <h3 class="text-3xl font-black text-cyan-600">{{ results|length }}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <p class="text-gray-400 text-xs font-bold uppercase mb-1">Status</p>
+                    <h3 class="text-lg font-bold text-cyan-500 flex items-center">
+                        <span class="w-2 h-2 bg-cyan-500 rounded-full animate-pulse mr-2"></span> System Online
+                    </h3>
+                </div>
+            </div>
+
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-8">
+                <form method="POST" onsubmit="showLoading()" class="flex flex-col md:flex-row items-end gap-4">
+                    {% csrf_token %}
+                    <div class="flex-1 w-full">
+                        <label class="block text-xs font-black text-gray-500 uppercase mb-2">Select Client Profile</label>
+                        <select name="client_id" class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 border outline-none focus:border-cyan-500 transition">
+                            {% for client in clients %}
+                                <option value="{{ client.id }}">{{ client.company_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button name="scrape_now" type="submit" class="w-full md:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-10 py-3.5 rounded-xl transition shadow-lg shadow-cyan-100 flex items-center justify-center">
+                        <i class="fas fa-spider mr-2"></i> Start Extraction
+                    </button>
+
+                    <button name="filter_by_state" type="submit" class="w-full md:w-auto bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-3.5 rounded-xl transition shadow-lg shadow-amber-100 flex items-center justify-center">
+                        <i class="fas fa-filter mr-2"></i> Tender Filter (State)
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 border-b border-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800 text-lg">Live Scraping Results</h3>
+                    <div class="flex gap-2">
+                        {% if results %}
+                        <form method="POST">
+                            {% csrf_token %}
+                            <button type="submit" name="export_excel" class="bg-white border border-cyan-200 text-cyan-600 text-xs font-bold px-4 py-2 rounded-lg hover:bg-cyan-50 transition flex items-center">
+                                <i class="fas fa-file-excel mr-2"></i> Export Excel
+                            </button>
+                        </form>
+                        <button onclick="sendOnWhatsApp()" class="bg-green-500 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600 transition flex items-center">
+                            <i class="fab fa-whatsapp mr-2"></i> WhatsApp Results
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-widest">
+                            <tr>
+                                <th class="px-6 py-4">Bid No</th>
+                                <th class="px-6 py-4">Category</th>
+                                <th class="px-6 py-4">Department</th>
+                                <th class="px-6 py-4">Dates</th>
+                                <th class="px-6 py-4 text-center">Link</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            {% if results %}
+                                {% for bid in results %}
+                                <tr class="hover:bg-cyan-50/30 transition text-sm">
+                                    <td class="px-6 py-4 font-bold text-cyan-700">{{ bid.bid_no }}</td>
+                                    <td class="px-6 py-4 text-gray-600 max-w-xs truncate">{{ bid.items }}</td>
+                                    <td class="px-6 py-4 text-gray-400 max-w-xs truncate">{{ bid.department }}</td>
+                                    <td class="px-6 py-4 text-xs font-medium">Start: {{ bid.start_date }}<br><span class="text-red-500 font-bold">End: {{ bid.end_date }}</span></td>
+                                    <td class="px-6 py-4 text-center">
+                                        <a href="{{ bid.link }}" target="_blank" class="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 hover:bg-cyan-600 hover:text-white inline-flex items-center justify-center transition">
+                                            <i class="fas fa-external-link-alt text-xs"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="5" class="px-6 py-20 text-center text-gray-300 italic">No bids extracted. Run scraper to see results.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="clientModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl p-8 glass">
+            <div class="flex justify-between items-center mb-8 border-b pb-4">
+                <h2 class="text-2xl font-black text-black tracking-tight">Register New Client</h2>
+                <button onclick="toggleModal()" class="text-gray-300 hover:text-red-500 transition text-3xl font-light">&times;</button>
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+                <div class="grid grid-cols-2 gap-8">
+                    <div class="col-span-1">
+                        <label class="block text-xs font-black text-gray-400 uppercase mb-2">Company Name</label>
+                        <input type="text" name="company_name" required class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 outline-none focus:border-cyan-500 transition">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-xs font-black text-gray-400 uppercase mb-2">Group Identifier</label>
+                        <input type="text" name="group_name" class="w-full border-gray-200 rounded-xl p-3 bg-gray-50 outline-none focus:border-cyan-500 transition">
+                    </div>
+                    
+                    <div class="col-span-1">
+                        <label class="block text-xs font-black text-cyan-600 uppercase mb-2">Select Categories</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="catSearch" onkeyup="filterOptions('catSearch', 'catList')" placeholder="Search..." class="flex-1 border-gray-200 rounded-t-xl p-2 text-sm outline-none focus:border-cyan-500">
+                            <button type="button" id="refreshCatsBtn" onclick="refreshCategories()" title="Refresh categories from GeM" class="bg-gray-100 border border-gray-200 px-3 rounded-lg hover:bg-gray-200 transition text-sm">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button type="button" id="viewFullCatsBtn" onclick="openCategoryListModal()" title="View full categories" class="bg-gray-100 border border-gray-200 px-3 rounded-lg hover:bg-gray-200 transition text-sm">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <select id="catList" name="categories" multiple class="w-full border border-gray-200 border-t-0 rounded-b-xl p-2 h-32 bg-gray-50 custom-scrollbar text-sm outline-none">
+                            {% for cat in categories %}
+                                <option title="{{ cat }}" class="p-2 border-b border-gray-50" value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <div class="flex justify-end gap-2 mt-2">
+                            <button type="button" onclick="scrollCats(-250)" title="Scroll left" class="scroll-btn bg-gray-100 border border-gray-200 rounded-md hover:bg-gray-200">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button type="button" onclick="scrollCats(250)" title="Scroll right" class="scroll-btn bg-gray-100 border border-gray-200 rounded-md hover:bg-gray-200">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <input type="text" id="manualCategory" placeholder="Add custom category..." class="flex-1 border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-cyan-500">
+                            <button type="button" onclick="addManualCategory()" class="bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700 transition text-sm font-bold">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button type="button" onclick="saveCustomCategory()" class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition text-sm font-bold" title="Save to master list">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-span-1">
+                        <label class="block text-xs font-black text-cyan-600 uppercase mb-2">Select States</label>
+                        <input type="text" id="stateSearch" onkeyup="filterOptions('stateSearch', 'stateList')" placeholder="Search..." class="w-full border-gray-200 rounded-t-xl p-2 text-sm outline-none focus:border-cyan-500">
+                        <select id="stateList" name="states" multiple class="w-full border border-gray-200 border-t-0 rounded-b-xl p-2 h-32 bg-gray-50 custom-scrollbar text-sm outline-none">
+                            {% for state in states %}
+                                <option class="p-2 border-b border-gray-50" value="{{ state }}">{{ state }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="flex gap-2 mt-2">
+                            <input type="text" id="manualState" placeholder="Add custom state..." class="flex-1 border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-cyan-500">
+                            <button type="button" onclick="addManualState()" class="bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700 transition text-sm font-bold">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button type="button" onclick="saveCustomState()" class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition text-sm font-bold" title="Save to master list">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-10 flex justify-end gap-4">
+                    <button type="button" onclick="toggleModal()" class="px-8 py-3 text-gray-400 font-bold hover:text-black transition">Cancel</button>
+                    <button type="submit" name="add_client" class="px-10 py-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 font-bold shadow-xl shadow-cyan-100 transition">
+                        Save Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Clients Management Modal -->
+    <div id="clientsListModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl p-8 glass max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6 border-b pb-4 sticky top-0 bg-white">
+                <h2 class="text-2xl font-black text-black tracking-tight">Manage Clients</h2>
+                <button onclick="closeClientsModal()" class="text-gray-300 hover:text-red-500 transition text-3xl font-light">&times;</button>
+            </div>
+
+            <div id="clientsTableContainer" class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50">
+                        <tr class="text-gray-600 text-xs font-bold uppercase tracking-widest">
+                            <th class="px-6 py-4">Company Name</th>
+                            <th class="px-6 py-4">Group Name</th>
+                            <th class="px-6 py-4">Categories</th>
+                            <th class="px-6 py-4">States</th>
+                            <th class="px-6 py-4">Created Date</th>
+                            <th class="px-6 py-4 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientsTableBody" class="divide-y divide-gray-50">
+                        <!-- Clients will be loaded here via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Full List Modal -->
+    <div id="categoryListModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl p-6 glass max-h-[80vh] overflow-hidden">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="text-2xl font-black text-black tracking-tight">All Categories</h2>
+                <button onclick="closeCategoryListModal()" class="text-gray-300 hover:text-red-500 transition text-3xl font-light">&times;</button>
+            </div>
+
+            <div class="mb-3">
+                <input id="categoryListSearch" onkeyup="filterCategoryModal()" placeholder="Filter categories..." class="w-full border p-2 rounded-lg text-sm outline-none focus:border-cyan-500">
+            </div>
+
+            <div id="categoryListContainer" class="overflow-auto p-2 space-y-2 h-[60vh]">
+                <!-- Categories will be injected here. Each item is horizontally scrollable -->
+            </div>
+
+            <div class="mt-4 flex justify-end">
+                <button onclick="selectAllFromModal()" class="px-4 py-2 bg-cyan-600 text-white rounded-lg mr-2">Select All</button>
+                <button onclick="closeCategoryListModal()" class="px-4 py-2 bg-gray-200 rounded-lg">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Client Modal -->
+    <div id="editClientModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-8 glass max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-8 border-b pb-4">
+                <h2 class="text-2xl font-black text-black tracking-tight">Edit Client</h2>
+                <button onclick="closeEditModal()" class="text-gray-300 hover:text-red-500 transition text-3xl font-light">&times;</button>
+            </div>
+
+            <form id="editClientForm" onsubmit="saveClientChanges(event)" class="space-y-4">
+                <input type="hidden" id="editClientId">
+                
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-2">Company Name</label>
+                    <input type="text" id="editCompanyName" required class="w-full border border-gray-200 rounded-xl p-3 bg-gray-50 outline-none focus:border-cyan-500 transition">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-2">Group Name</label>
+                    <input type="text" id="editGroupName" class="w-full border border-gray-200 rounded-xl p-3 bg-gray-50 outline-none focus:border-cyan-500 transition">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-black text-cyan-600 uppercase mb-2">Select Categories</label>
+                    <input type="text" id="editCatSearch" onkeyup="filterEditOptions('editCatSearch', 'editCatList')" placeholder="Search..." class="w-full border-gray-200 rounded-t-xl p-2 text-sm outline-none focus:border-cyan-500">
+                    <select id="editCatList" multiple class="w-full border border-gray-200 border-t-0 rounded-b-xl p-2 h-32 bg-gray-50 custom-scrollbar text-sm outline-none">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                    <div class="flex gap-2 mt-2">
+                        <input type="text" id="editManualCategory" placeholder="Add custom category..." class="flex-1 border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-cyan-500">
+                        <button type="button" onclick="addEditManualCategory()" class="bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700 transition text-sm font-bold">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button type="button" onclick="saveCustomCategoryFromEdit()" class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition text-sm font-bold" title="Save to master list">
+                            <i class="fas fa-save"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-black text-cyan-600 uppercase mb-2">Select States</label>
+                    <input type="text" id="editStateSearch" onkeyup="filterEditOptions('editStateSearch', 'editStateList')" placeholder="Search..." class="w-full border-gray-200 rounded-t-xl p-2 text-sm outline-none focus:border-cyan-500">
+                    <select id="editStateList" multiple class="w-full border border-gray-200 border-t-0 rounded-b-xl p-2 h-32 bg-gray-50 custom-scrollbar text-sm outline-none">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                    <div class="flex gap-2 mt-2">
+                        <input type="text" id="editManualState" placeholder="Add custom state..." class="flex-1 border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-cyan-500">
+                        <button type="button" onclick="addEditManualState()" class="bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700 transition text-sm font-bold">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button type="button" onclick="saveCustomStateFromEdit()" class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition text-sm font-bold" title="Save to master list">
+                            <i class="fas fa-save"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-4 mt-6">
+                    <button type="button" onclick="closeEditModal()" class="px-8 py-3 text-gray-400 font-bold hover:text-black transition">Cancel</button>
+                    <button type="submit" class="px-10 py-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700 font-bold shadow-xl shadow-cyan-100 transition">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Success/Error Notification Popup -->
+    <div id="notificationPopup" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 glass animate-in">
+            <div class="text-center">
+                <div id="notificationIcon" class="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl">
+                    <!-- Icon will be set by JavaScript -->
+                </div>
+                <h2 id="notificationTitle" class="text-2xl font-black text-black mb-2 tracking-tight">
+                    <!-- Title will be set by JavaScript -->
+                </h2>
+                <p id="notificationMessage" class="text-gray-600 mb-6 text-sm">
+                    <!-- Message will be set by JavaScript -->
+                </p>
+                <button onclick="closeNotificationPopup()" class="w-full px-6 py-3 bg-cyan-600 text-white font-bold rounded-xl hover:bg-cyan-700 transition shadow-lg shadow-cyan-100">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Popup -->
+    <div id="deleteConfirmPopup" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 glass">
+            <div class="text-center">
+                <div class="w-16 h-16 rounded-full bg-red-100 mx-auto mb-4 flex items-center justify-center text-red-500 text-3xl">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h2 class="text-2xl font-black text-black mb-2 tracking-tight">Confirm Delete</h2>
+                <p id="deleteConfirmMessage" class="text-gray-600 mb-8 text-sm">
+                    <!-- Message will be set by JavaScript -->
+                </p>
+                <div class="flex gap-4">
+                    <button onclick="cancelDelete()" class="flex-1 px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition">
+                        Cancel
+                    </button>
+                    <button onclick="confirmDeleteAction()" class="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition shadow-lg shadow-red-100">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pendingDeleteId = null;
+
+        function toggleModal() { document.getElementById('clientModal').classList.toggle('hidden'); }
+        function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
+        
+        function filterOptions(inputId, selectId) {
+            let input = document.getElementById(inputId).value.toUpperCase();
+            let options = document.getElementById(selectId).getElementsByTagName("option");
+            for (let opt of options) {
+                opt.style.display = opt.text.toUpperCase().includes(input) ? "" : "none";
+            }
+        }
+
+        function addManualCategory() {
+            const input = document.getElementById('manualCategory');
+            const value = input.value.trim();
+            if (value) {
+                const select = document.getElementById('catList');
+                const option = document.createElement('option');
+                option.value = value;
+                option.text = value;
+                option.className = 'p-2 border-b border-gray-50';
+                select.appendChild(option);
+                input.value = '';
+                showSuccessPopup('Added!', 'Category added successfully');
+                setTimeout(() => closeNotificationPopup(), 1500);
+            }
+        }
+
+        function addManualCategory() {
+            const input = document.getElementById('manualCategory');
+            const value = input.value.trim();
+            if (value) {
+                const select = document.getElementById('catList');
+                const option = document.createElement('option');
+                option.value = value;
+                option.text = value;
+                option.className = 'p-2 border-b border-gray-50';
+                select.appendChild(option);
+                input.value = '';
+                showSuccessPopup('Added!', 'Category added successfully');
+                setTimeout(() => closeNotificationPopup(), 1500);
+            }
+        }
+
+        function addManualState() {
+            const input = document.getElementById('manualState');
+            const value = input.value.trim();
+            if (value) {
+                const select = document.getElementById('stateList');
+                const option = document.createElement('option');
+                option.value = value;
+                option.text = value;
+                option.className = 'p-2 border-b border-gray-50';
+                select.appendChild(option);
+                input.value = '';
+                showSuccessPopup('Added!', 'State added successfully');
+                setTimeout(() => closeNotificationPopup(), 1500);
+            }
+        }
+
+        // Add keyboard support for manual inputs
+        document.addEventListener('DOMContentLoaded', function() {
+            const manualCategoryInput = document.getElementById('manualCategory');
+            const manualStateInput = document.getElementById('manualState');
+            const editManualCategoryInput = document.getElementById('editManualCategory');
+            const editManualStateInput = document.getElementById('editManualState');
+
+            if (manualCategoryInput) {
+                manualCategoryInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addManualCategory();
+                    }
+                });
+            }
+
+            if (manualStateInput) {
+                manualStateInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addManualState();
+                    }
+                });
+            }
+
+            if (editManualCategoryInput) {
+                editManualCategoryInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addEditManualCategory();
+                    }
+                });
+            }
+
+            if (editManualStateInput) {
+                editManualStateInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addEditManualState();
+                    }
+                });
+            }
+        });
+
+        function sendOnWhatsApp() {
+            const rows = document.querySelectorAll('tbody tr');
+            let message = "*🔥 GeM New Bids - OvinEnterPrises 🔥*\n\n";
+            rows.forEach((row, index) => {
+                if (row.cells.length > 1) {
+                    message += `*${index + 1}. Bid:* ${row.cells[0].innerText}\n`;
+                    message += `*Item:* ${row.cells[1].innerText}\n`;
+                    message += `*Link:* ${row.querySelector('a').href}\n\n`;
+                }
+            });
+            window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+        }
+
+        // ===== NOTIFICATION POPUP FUNCTIONS =====
+        
+        function showSuccessPopup(title, message) {
+            const popup = document.getElementById('notificationPopup');
+            const icon = document.getElementById('notificationIcon');
+            const titleEl = document.getElementById('notificationTitle');
+            const messageEl = document.getElementById('notificationMessage');
+            
+            icon.className = 'w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl bg-green-500';
+            icon.innerHTML = '<i class="fas fa-check"></i>';
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            
+            popup.classList.remove('hidden');
+        }
+
+        function showErrorPopup(title, message) {
+            const popup = document.getElementById('notificationPopup');
+            const icon = document.getElementById('notificationIcon');
+            const titleEl = document.getElementById('notificationTitle');
+            const messageEl = document.getElementById('notificationMessage');
+            
+            icon.className = 'w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl bg-red-500';
+            icon.innerHTML = '<i class="fas fa-times"></i>';
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            
+            popup.classList.remove('hidden');
+        }
+
+        function closeNotificationPopup() {
+            document.getElementById('notificationPopup').classList.add('hidden');
+        }
+
+        function showDeleteConfirmPopup(clientId, clientName) {
+            pendingDeleteId = clientId;
+            const messageEl = document.getElementById('deleteConfirmMessage');
+            messageEl.textContent = `Are you sure you want to delete "${clientName}"? This action cannot be undone.`;
+            document.getElementById('deleteConfirmPopup').classList.remove('hidden');
+        }
+
+        function cancelDelete() {
+            pendingDeleteId = null;
+            document.getElementById('deleteConfirmPopup').classList.add('hidden');
+        }
+
+        function confirmDeleteAction() {
+            if (pendingDeleteId) {
+                document.getElementById('deleteConfirmPopup').classList.add('hidden');
+                deleteClient(pendingDeleteId);
+                pendingDeleteId = null;
+            }
+        }
+
+        // ===== CLIENT MANAGEMENT FUNCTIONS =====
+        
+        function openClientsModal() {
+            fetch('/api/clients/')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('clientsTableBody');
+                    tableBody.innerHTML = '';
+                    
+                    if (data.clients.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-10 text-center text-gray-400 italic">No clients yet. Add one from the sidebar.</td></tr>';
+                        document.getElementById('clientsListModal').classList.remove('hidden');
+                        return;
+                    }
+                    
+                    data.clients.forEach(client => {
+                        const row = document.createElement('tr');
+                        row.className = 'hover:bg-cyan-50/30 transition';
+                        
+                        const editBtn = document.createElement('button');
+                        editBtn.className = 'bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold mr-2 transition';
+                        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
+                        editBtn.addEventListener('click', () => {
+                            openEditModal(client.id, client.company_name, client.group_name, client.categories, client.states);
+                        });
+                        
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-bold transition';
+                        deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                        deleteBtn.addEventListener('click', () => {
+                            showDeleteConfirmPopup(client.id, client.company_name);
+                        });
+                        
+                        const actionCell = document.createElement('td');
+                        actionCell.className = 'px-6 py-4 text-center';
+                        actionCell.appendChild(editBtn);
+                        actionCell.appendChild(deleteBtn);
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 font-bold text-cyan-700">${client.company_name}</td>
+                            <td class="px-6 py-4 text-gray-600">${client.group_name || '-'}</td>
+                            <td class="px-6 py-4 text-gray-600 text-sm max-w-xs truncate">${client.categories}</td>
+                            <td class="px-6 py-4 text-gray-600 text-sm max-w-xs truncate">${client.states}</td>
+                            <td class="px-6 py-4 text-gray-500 text-xs">${client.created_at}</td>
+                        `;
+                        row.appendChild(actionCell);
+                        tableBody.appendChild(row);
+                    });
+                    
+                    document.getElementById('clientsListModal').classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error fetching clients:', error);
+                    showErrorPopup('Error', 'Failed to load clients');
+                });
+        }
+
+        function closeClientsModal() {
+            document.getElementById('clientsListModal').classList.add('hidden');
+        }
+
+        function openEditModal(clientId, companyName, groupName, categories, states) {
+            document.getElementById('editClientId').value = clientId;
+            document.getElementById('editCompanyName').value = companyName;
+            document.getElementById('editGroupName').value = groupName;
+            
+            // Fetch categories and states from backend to populate dropdowns
+            fetch('/api/clients/')
+                .then(response => response.json())
+                .then(data => {
+                    // Get all available categories and states from the page (they're in the Add Client form)
+                    const allCatsSelect = document.getElementById('catList');
+                    const allStatesSelect = document.getElementById('stateList');
+                    
+                    const editCatList = document.getElementById('editCatList');
+                    const editStateList = document.getElementById('editStateList');
+                    
+                    // Clear and populate categories dropdown
+                    editCatList.innerHTML = '';
+                    for (let option of allCatsSelect.options) {
+                        const newOption = document.createElement('option');
+                        newOption.value = option.value;
+                        newOption.text = option.text;
+                        editCatList.appendChild(newOption);
+                    }
+                    
+                    // Clear and populate states dropdown
+                    editStateList.innerHTML = '';
+                    for (let option of allStatesSelect.options) {
+                        const newOption = document.createElement('option');
+                        newOption.value = option.value;
+                        newOption.text = option.text;
+                        editStateList.appendChild(newOption);
+                    }
+                    
+                    // Pre-select the client's current categories
+                    const categoriesArray = categories.split(',').map(c => c.trim());
+                    for (let option of editCatList.options) {
+                        option.selected = categoriesArray.includes(option.value);
+                    }
+                    
+                    // Pre-select the client's current states
+                    const statesArray = states.split(',').map(s => s.trim());
+                    for (let option of editStateList.options) {
+                        option.selected = statesArray.includes(option.value);
+                    }
+                    
+                    document.getElementById('editClientModal').classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error loading categories and states:', error);
+                    showErrorPopup('Error', 'Failed to load dropdown options');
+                });
+        }
+
+        function closeEditModal() {
+            document.getElementById('editClientModal').classList.add('hidden');
+            document.getElementById('editClientForm').reset();
+        }
+
+        function filterEditOptions(inputId, selectId) {
+            let input = document.getElementById(inputId).value.toUpperCase();
+            let options = document.getElementById(selectId).getElementsByTagName("option");
+            for (let opt of options) {
+                opt.style.display = opt.text.toUpperCase().includes(input) ? "" : "none";
+            }
+        }
+
+        function addEditManualCategory() {
+            const input = document.getElementById('editManualCategory');
+            const value = input.value.trim();
+            if (value) {
+                const select = document.getElementById('editCatList');
+                const option = document.createElement('option');
+                option.value = value;
+                option.text = value;
+                option.className = 'p-2 border-b border-gray-50';
+                select.appendChild(option);
+                input.value = '';
+                showSuccessPopup('Added!', 'Category added successfully');
+                setTimeout(() => closeNotificationPopup(), 1500);
+            }
+        }
+
+        function addEditManualState() {
+            const input = document.getElementById('editManualState');
+            const value = input.value.trim();
+            if (value) {
+                const select = document.getElementById('editStateList');
+                const option = document.createElement('option');
+                option.value = value;
+                option.text = value;
+                option.className = 'p-2 border-b border-gray-50';
+                select.appendChild(option);
+                input.value = '';
+                showSuccessPopup('Added!', 'State added successfully');
+                setTimeout(() => closeNotificationPopup(), 1500);
+            }
+        }
+
+        function saveClientChanges(event) {
+            event.preventDefault();
+            
+            const clientId = document.getElementById('editClientId').value;
+            const companyName = document.getElementById('editCompanyName').value;
+            const groupName = document.getElementById('editGroupName').value;
+            
+            // Get selected categories
+            const editCatList = document.getElementById('editCatList');
+            const categories = Array.from(editCatList.selectedOptions).map(option => option.value).join(', ');
+            
+            // Get selected states
+            const editStateList = document.getElementById('editStateList');
+            const states = Array.from(editStateList.selectedOptions).map(option => option.value).join(', ');
+            
+            fetch('/api/update-client/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    id: clientId,
+                    company_name: companyName,
+                    group_name: groupName,
+                    categories: categories,
+                    states: states
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeEditModal();
+                    showSuccessPopup('Updated!', 'Client information has been updated successfully');
+                    setTimeout(() => {
+                        closeNotificationPopup();
+                        openClientsModal();
+                    }, 1500);
+                } else {
+                    showErrorPopup('Error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating client:', error);
+                showErrorPopup('Error', 'Failed to update client');
+            });
+        }
+
+        function deleteClient(clientId) {
+            fetch('/api/delete-client/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ id: clientId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessPopup('Deleted!', 'Client has been removed successfully');
+                    setTimeout(() => {
+                        closeNotificationPopup();
+                        openClientsModal();
+                    }, 1500);
+                } else {
+                    showErrorPopup('Error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting client:', error);
+                showErrorPopup('Error', 'Failed to delete client');
+            });
+        }
+
+        function saveCustomCategory() {
+            const input = document.getElementById('manualCategory');
+            const value = input.value.trim();
+            
+            if (!value) {
+                showErrorPopup('Empty Category', 'Please enter a category name');
+                return;
+            }
+            
+            fetch('/api/save-custom-category/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ category: value })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessPopup('Saved!', data.message);
+                    setTimeout(() => {
+                        closeNotificationPopup();
+                        // Reload page to fetch updated categories
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showErrorPopup('Error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving category:', error);
+                showErrorPopup('Error', 'Failed to save category');
+            });
+        }
+
+        function saveCustomState() {
+            const input = document.getElementById('manualState');
+            const value = input.value.trim();
+            
+            if (!value) {
+                showErrorPopup('Empty State', 'Please enter a state name');
+                return;
+            }
+            
+            fetch('/api/save-custom-state/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ state: value })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessPopup('Saved!', data.message);
+                    setTimeout(() => {
+                        closeNotificationPopup();
+                        // Reload page to fetch updated states
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showErrorPopup('Error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving state:', error);
+                showErrorPopup('Error', 'Failed to save state');
+            });
+        }
+
+        function saveCustomCategoryFromEdit() {
+            const input = document.getElementById('editManualCategory');
+            const value = input.value.trim();
+            
+            if (!value) {
+                showErrorPopup('Empty Category', 'Please enter a category name');
+                return;
+            }
+            
+            fetch('/api/save-custom-category/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ category: value })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessPopup('Saved!', data.message);
+                    setTimeout(() => {
+                        closeNotificationPopup();
+                        // Add to the edit select list
+                        const select = document.getElementById('editCatList');
+                        const option = document.createElement('option');
+                        option.value = value;
+                        option.text = value;
+                        option.selected = true;
+                        select.appendChild(option);
+                        input.value = '';
+                    }, 1500);
+                } else {
+                    showErrorPopup('Error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving category:', error);
+                showErrorPopup('Error', 'Failed to save category');
+            });
+        }
+
+        // Trigger background refresh of categories (starts scraper subprocess) and poll for updated list
+        function refreshCategories() {
+            const btn = document.getElementById('refreshCatsBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            fetch('/api/refresh-categories/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({})
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.started) {
+                    // Poll for categories update
+                    const start = Date.now();
+                    const poll = setInterval(() => {
+                        fetch('/api/get-categories/')
+                            .then(r => r.json())
+                            .then(result => {
+                                if (result.categories && result.categories.length > 0) {
+                                    updateCategoryList(result.categories);
+                                    clearInterval(poll);
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                                    showSuccessPopup('Updated', 'Categories refreshed successfully');
+                                    setTimeout(() => closeNotificationPopup(), 1500);
+                                } else if (Date.now() - start > 60000) { // timeout 60s
+                                    clearInterval(poll);
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                                    showErrorPopup('Timeout', 'Failed to refresh categories in time');
+                                }
+                            })
+                            .catch(() => {});
+                    }, 2000);
+                } else {
+                    showErrorPopup('Error', 'Failed to start category refresh');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showErrorPopup('Error', 'Failed to start category refresh');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+            });
+        }
+
+        function updateCategoryList(categories) {
+            const select = document.getElementById('catList');
+            const editSelect = document.getElementById('editCatList');
+            const previous = Array.from(select.selectedOptions).map(o => o.value);
+            select.innerHTML = '';
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.text = c;
+                opt.title = c;
+                opt.className = 'p-2 border-b border-gray-50';
+                select.appendChild(opt);
+            });
+            // also update edit select if present
+            if (editSelect) {
+                editSelect.innerHTML = '';
+                categories.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.text = c;
+                    opt.title = c;
+                    editSelect.appendChild(opt);
+                });
+            }
+            // restore previous selections where possible
+            for (let opt of select.options) {
+                if (previous.includes(opt.value)) opt.selected = true;
+            }
+        }
+
+        // Category Modal functions
+        function openCategoryListModal() {
+            const modal = document.getElementById('categoryListModal');
+            const container = document.getElementById('categoryListContainer');
+            container.innerHTML = '';
+            const select = document.getElementById('catList');
+            // populate from current select options
+            for (let opt of select.options) {
+                const item = document.createElement('div');
+                item.className = 'p-2 border rounded-lg flex items-center justify-between';
+
+                const textWrap = document.createElement('div');
+                textWrap.className = 'flex-1 overflow-x-auto whitespace-nowrap pr-4 text-sm';
+                textWrap.textContent = opt.text;
+                textWrap.title = opt.text;
+
+                const btn = document.createElement('button');
+                btn.className = 'px-3 py-1 bg-gray-100 rounded text-sm';
+                btn.textContent = opt.selected ? 'Deselect' : 'Select';
+                btn.addEventListener('click', () => {
+                    opt.selected = !opt.selected;
+                    btn.textContent = opt.selected ? 'Deselect' : 'Select';
+                });
+
+                item.appendChild(textWrap);
+                item.appendChild(btn);
+                container.appendChild(item);
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeCategoryListModal() {
+            document.getElementById('categoryListModal').classList.add('hidden');
+        }
+
+        function filterCategoryModal() {
+            const q = document.getElementById('categoryListSearch').value.toUpperCase();
+            const container = document.getElementById('categoryListContainer');
+            const items = container.children;
+            for (let it of items) {
+                const txt = it.firstChild.textContent.toUpperCase();
+                it.style.display = txt.includes(q) ? '' : 'none';
+            }
+        }
+
+        function selectAllFromModal() {
+            const select = document.getElementById('catList');
+            for (let opt of select.options) opt.selected = true;
+            // update modal buttons
+            const container = document.getElementById('categoryListContainer');
+            for (let it of container.children) {
+                const btn = it.querySelector('button');
+                if (btn) btn.textContent = 'Deselect';
+            }
+        }
+
+        function scrollCats(amount) {
+            const el = document.getElementById('catList');
+            if (!el) return;
+            el.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+
+        function saveCustomStateFromEdit() {
+            const input = document.getElementById('editManualState');
+            const value = input.value.trim();
+            
+            if (!value) {
+                showErrorPopup('Empty State', 'Please enter a state name');
+                return;
+            }
+            
+            fetch('/api/save-custom-state/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ state: value })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessPopup('Saved!', data.message);
+                    setTimeout(() => {
+                        closeNotificationPopup();
+                        // Add to the edit select list
+                        const select = document.getElementById('editStateList');
+                        const option = document.createElement('option');
+                        option.value = value;
+                        option.text = value;
+                        option.selected = true;
+                        select.appendChild(option);
+                        input.value = '';
+                    }, 1500);
+                } else {
+                    showErrorPopup('Error', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving state:', error);
+                showErrorPopup('Error', 'Failed to save state');
+            });
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>
