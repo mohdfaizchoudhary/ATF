@@ -117,7 +117,6 @@ mysqlclient==2.2.7
 networkx==3.5
 nh3==0.3.0
 ninja==1.13.0
-numba==0.62.1
 numpy==2.2.6
 oauthlib==3.3.1
 openai==2.7.2
