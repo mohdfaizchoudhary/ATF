@@ -169,162 +169,71 @@
     
 #     return all_final_results
 
-import time
+
+
+
 import requests
-import tempfile
-import os
-import pdfplumber
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
-
-from webdriver_manager.chrome import ChromeDriverManager
+BASE_URL = "https://bidplus.gem.gov.in/bidlists"
 
 
-# ---------------- PDF STATE CHECK ---------------- #
-def check_states_in_pdf(pdf_url, target_states):
-    try:
-        if not pdf_url or "javascript" in pdf_url.lower():
-            return False
-
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(pdf_url, headers=headers, timeout=15)
-
-        if response.status_code == 200 and b"%PDF" in response.content[:10]:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(response.content)
-                tmp_path = tmp.name
-
-            match = False
-            try:
-                with pdfplumber.open(tmp_path) as pdf:
-                    for page in pdf.pages:
-                        text = page.extract_text()
-                        if text:
-                            text = text.upper()
-                            for state in target_states:
-                                if state in text:
-                                    match = True
-                                    break
-                        if match:
-                            break
-            finally:
-                os.remove(tmp_path)
-
-            return match
-
-    except Exception as e:
-        print("PDF Error:", e)
-
-    return False
-
-
-# ---------------- DRIVER SETUP ---------------- #
-def get_driver():
-    options = Options()
-
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-
-    # Render compatible
-    if os.path.exists("/usr/bin/google-chrome"):
-        options.binary_location = "/usr/bin/google-chrome"
-
-    service = Service(ChromeDriverManager().install())
-
-    driver = webdriver.Chrome(service=service, options=options)
-    return driver
-
-
-# ---------------- SINGLE CATEGORY SCRAPER ---------------- #
-def start_gem_scraping(category_text, states_text):
-    driver = get_driver()
-    wait = WebDriverWait(driver, 15)
-
+def start_gem_scraping(category_text, states_text=""):
     results = []
+    page = 1
 
-    try:
-        driver.get("https://bidplus.gem.gov.in/advance-search")
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json, text/plain, */*"
+    }
 
-        # CATEGORY
-        wait.until(EC.element_to_be_clickable((By.ID, 'select2-categorybid-container'))).click()
-        search = wait.until(EC.presence_of_element_located((By.XPATH, '/html/body/span/span/span[1]/input')))
-        search.send_keys(category_text)
-        time.sleep(1)
-        search.send_keys(Keys.ENTER)
+    while True:
+        try:
+            params = {
+                "page": page,
+                "search": category_text
+            }
 
-        # SEARCH BUTTON
-        btn = wait.until(EC.element_to_be_clickable((By.ID, "searchByBid")))
-        driver.execute_script("arguments[0].click();", btn)
+            response = requests.get(BASE_URL, headers=headers, params=params, timeout=15)
 
-        time.sleep(2)
-
-        while True:
-            cards = driver.find_elements(By.XPATH, '//*[@id="bidCard"]/div')
-
-            if not cards:
+            if response.status_code != 200:
                 break
 
-            for card in cards:
-                try:
-                    text = card.text
+            data = response.json()
 
-                    if "BID NO" not in text.upper():
-                        continue
+            bids = data.get("data", [])
 
-                    lines = text.split("\n")
-
-                    bid_no = lines[0]
-                    items = next((l for l in lines if "Items:" in l), "N/A")
-                    dept = next((l for l in lines if "Department" in l), "N/A")
-
-                    link = card.find_element(By.TAG_NAME, "a").get_attribute("href")
-
-                    if not any(r['bid_no'] == bid_no for r in results):
-                        results.append({
-                            "category": category_text,
-                            "bid_no": bid_no,
-                            "items": items,
-                            "department": dept,
-                            "start_date": "",
-                            "end_date": "",
-                            "link": link
-                        })
-
-                except:
-                    continue
-
-            # NEXT PAGE
-            try:
-                next_btn = driver.find_element(By.XPATH, "//a[contains(text(),'Next')]")
-                driver.execute_script("arguments[0].click();", next_btn)
-                time.sleep(2)
-            except:
+            if not bids:
                 break
 
-    except Exception as e:
-        print("Scraper Error:", e)
+            for bid in bids:
+                bid_no = bid.get("bid_no")
+                department = bid.get("dept_name")
+                items = bid.get("items")
 
-    finally:
-        driver.quit()
+                results.append({
+                    "category": category_text,
+                    "bid_no": bid_no,
+                    "items": items,
+                    "department": department,
+                    "start_date": bid.get("start_date"),
+                    "end_date": bid.get("end_date"),
+                    "link": f"https://bidplus.gem.gov.in/bidlists/{bid_no}"
+                })
+
+            page += 1
+
+        except Exception as e:
+            print("API Error:", e)
+            break
 
     return results
 
 
-# ---------------- MULTI CATEGORY ---------------- #
-def start_gem_scraping_multiple(categories, states_text):
+def start_gem_scraping_multiple(categories, states_text=""):
     all_results = []
 
     for cat in categories:
-        data = start_gem_scraping(cat, states_text)
+        data = start_gem_scraping(cat)
 
         for item in data:
             if not any(r['bid_no'] == item['bid_no'] for r in all_results):
