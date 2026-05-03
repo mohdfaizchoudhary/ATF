@@ -239,16 +239,11 @@ def start_gem_scraping(category_text, states_text):
     options.add_experimental_option("prefs", prefs)
     options.page_load_strategy = 'eager'
 
-    # 🔥 UPDATED CHROME LOGIC (Render + Local)
-    if os.environ.get("RENDER"):
-        options.binary_location = "/opt/render/project/src/chrome-linux64/chrome"
-        service = Service("/opt/render/project/src/chromedriver-linux64/chromedriver")
-        driver = webdriver.Chrome(service=service, options=options)
-    else:
-        driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options
-        )
+    # ✅ Use ChromeDriverManager for both Render and local
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options
+    )
 
     wait = WebDriverWait(driver, 15)
     all_final_results = []

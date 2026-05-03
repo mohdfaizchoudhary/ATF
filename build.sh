@@ -4,12 +4,9 @@
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Install Chrome
-apt-get update
-apt-get install -y wget unzip
+# Install Google Chrome (stable) for Selenium
+# chromium-browser or google-chrome is available in Render's Ubuntu environment
+apt-get install -y google-chrome-stable || true
 
-wget https://storage.googleapis.com/chrome-for-testing-public/124.0.6367.91/linux64/chrome-linux64.zip
-unzip chrome-linux64.zip
-
-wget https://storage.googleapis.com/chrome-for-testing-public/124.0.6367.91/linux64/chromedriver-linux64.zip
-unzip chromedriver-linux64.zip
+# Run Django collectstatic
+python manage.py collectstatic --no-input
