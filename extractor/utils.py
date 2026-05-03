@@ -178,6 +178,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from webdriver_manager.chrome import ChromeDriverManager
 import requests
 import tempfile
 import os
@@ -228,7 +229,7 @@ def check_states_in_pdf(pdf_url, target_states):
 
 def start_gem_scraping(category_text, states_text):
     options = Options()
-    options.add_argument("--headless")
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
@@ -243,7 +244,10 @@ def start_gem_scraping(category_text, states_text):
         service = Service("/opt/render/project/src/chromedriver-linux64/chromedriver")
         driver = webdriver.Chrome(service=service, options=options)
     else:
-        driver = webdriver.Chrome(options=options)
+        driver = webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()),
+            options=options
+        )
 
     wait = WebDriverWait(driver, 15)
     all_final_results = []
