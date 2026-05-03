@@ -178,7 +178,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from webdriver_manager.chrome import ChromeDriverManager
 import requests
 import tempfile
 import os
@@ -239,16 +238,10 @@ def start_gem_scraping(category_text, states_text):
     options.add_experimental_option("prefs", prefs)
     options.page_load_strategy = 'eager'
 
-    # Render: use Chrome for Testing binaries downloaded in build.sh
-    if os.environ.get("RENDER"):
-        options.binary_location = "/opt/render/project/src/chrome-linux64/chrome"
-        service = Service("/opt/render/project/src/chromedriver-linux64/chromedriver")
-        driver = webdriver.Chrome(service=service, options=options)
-    else:
-        driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options
-        )
+    # Use Selenium Manager (built into Selenium 4.6+) - auto-downloads Chrome + driver
+    # Works on Render, local, and any Linux environment without needing root/apt-get
+    os.environ.setdefault("SE_CACHE_PATH", "/tmp/selenium_cache")
+    driver = webdriver.Chrome(options=options)
 
     wait = WebDriverWait(driver, 15)
     all_final_results = []
