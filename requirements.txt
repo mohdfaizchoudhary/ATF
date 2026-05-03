@@ -143,7 +143,7 @@ PyAutoGUI==0.9.54
 pyclipper==1.4.0
 pycparser==2.23
 pycryptodomex==3.23.0
-pydantic==2.11.7
+pydantic==2.7.4
 pydantic-settings==2.12.0
 pydantic_core==2.33.2
 pydub==0.25.1
